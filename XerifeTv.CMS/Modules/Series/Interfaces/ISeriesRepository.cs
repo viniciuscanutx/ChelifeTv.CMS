@@ -1,4 +1,5 @@
 ﻿using XerifeTv.CMS.Modules.Abstractions.Interfaces;
+using XerifeTv.CMS.Modules.Abstractions.ValueObjects;
 using XerifeTv.CMS.Modules.Common;
 using XerifeTv.CMS.Modules.Common.Dtos;
 using XerifeTv.CMS.Modules.Series.Dtos.Request;
@@ -19,4 +20,6 @@ public interface ISeriesRepository : IBaseRepository<SeriesEntity>
     Task<ICollection<SeriesEntity>> GetSeriesRecommendedBySeriesIdAsync(string seriesId, int limit);
     Task<IEnumerable<SeriesEntity>> GetSeriesByFranchiseIdAsync(string franchiseId, int limit, string? seriesIdIgnore = null);
     Task<long> CountByFranchiseIdAsync(string franchiseId);
+    Task<IReadOnlyList<SeriesEntity>> GetWithEpisodesByVideoHostAsync(string host);
+    Task UpdateEpisodesVideoUrlsAsync(string seriesId, IEnumerable<(string EpisodeId, Video? Video, string? AlternativeVideoUrl)> episodes);
 }

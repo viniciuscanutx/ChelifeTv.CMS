@@ -1,11 +1,18 @@
+using XerifeTv.CMS.Modules.Abstractions.ValueObjects;
 using XerifeTv.CMS.Modules.CatalogProvider.Dtos.Request;
 using XerifeTv.CMS.Modules.CatalogProvider.Dtos.Response;
 using XerifeTv.CMS.Modules.CatalogProvider.Interfaces;
 using XerifeTv.CMS.Modules.Common;
+using XerifeTv.CMS.Modules.Movie.Interfaces;
+using XerifeTv.CMS.Modules.Series.Interfaces;
 
 namespace XerifeTv.CMS.Modules.CatalogProvider;
 
-public class CatalogProviderService(ICatalogProviderRepository _repository) : ICatalogProviderService
+public class CatalogProviderService(
+    ICatalogProviderRepository _repository,
+    IMovieRepository _movieRepository,
+    ISeriesRepository _seriesRepository,
+    ILogger<CatalogProviderService> _logger) : ICatalogProviderService
 {
     public async Task<Result<IEnumerable<GetCatalogProviderResponseDto>>> GetAllAsync(bool isIncludeDisabled = false)
     {
@@ -78,6 +85,10 @@ public class CatalogProviderService(ICatalogProviderRepository _repository) : IC
 
             entity.CreateAt = response.CreateAt;
             await _repository.UpdateAsync(entity);
+
+            // Token do provedor girou: leva os links gravados pro BaseUrl atual
+            await RebaseContentUrlsAsync(entity.BaseUrl);
+
             return Result<string>.Success(entity.Id);
         }
         catch (Exception ex)
@@ -105,6 +116,66 @@ public class CatalogProviderService(ICatalogProviderRepository _repository) : IC
             return Result<bool>.Failure(error);
         }
     }
+
+    private async Task RebaseContentUrlsAsync(string baseUrl)
+    {
+        var host = CatalogUrlRebaser.GetHost(baseUrl);
+        if (host is null) return;
+
+        var moviesUpdated = await RebaseMovieUrlsAsync(host, baseUrl);
+        var episodesUpdated = await RebaseEpisodeUrlsAsync(host, baseUrl);
+
+        _logger.LogInformation(
+            "Catalog provider {Host}: {Movies} movies and {Episodes} episodes moved to the current base URL",
+            host, moviesUpdated, episodesUpdated);
+    }
+
+    private async Task<int> RebaseMovieUrlsAsync(string host, string baseUrl)
+    {
+        var movies = await _movieRepository.GetByVideoHostAsync(host);
+        var updatedCount = 0;
+
+        foreach (var movie in movies)
+        {
+            var video = RebaseVideo(movie.Video, baseUrl);
+            var alternativeVideoUrl = CatalogUrlRebaser.Rebase(movie.AlternativeVideoUrl, baseUrl);
+
+            if (video == movie.Video && alternativeVideoUrl == movie.AlternativeVideoUrl) continue;
+
+            await _movieRepository.UpdateVideoUrlsAsync(movie.Id, video, alternativeVideoUrl);
+            updatedCount++;
+        }
+
+        return updatedCount;
+    }
+
+    private async Task<int> RebaseEpisodeUrlsAsync(string host, string baseUrl)
+    {
+        var seriesList = await _seriesRepository.GetWithEpisodesByVideoHostAsync(host);
+        var updatedCount = 0;
+
+        foreach (var series in seriesList)
+        {
+            var changedEpisodes = series.Episodes
+                .Select(episode => (
+                    Original: episode,
+                    Video: RebaseVideo(episode.Video, baseUrl),
+                    AlternativeVideoUrl: CatalogUrlRebaser.Rebase(episode.AlternativeVideoUrl, baseUrl)))
+                .Where(x => x.Video != x.Original.Video || x.AlternativeVideoUrl != x.Original.AlternativeVideoUrl)
+                .Select(x => (x.Original.Id, x.Video, x.AlternativeVideoUrl))
+                .ToList();
+
+            if (changedEpisodes.Count == 0) continue;
+
+            await _seriesRepository.UpdateEpisodesVideoUrlsAsync(series.Id, changedEpisodes);
+            updatedCount += changedEpisodes.Count;
+        }
+
+        return updatedCount;
+    }
+
+    private static Video? RebaseVideo(Video? video, string baseUrl)
+        => video is null ? null : video with { Url = CatalogUrlRebaser.Rebase(video.Url, baseUrl) ?? video.Url };
 
     // Só um provedor pode ser o padrão: ao marcar um, desmarca os demais.
     private async Task ClearDefaultAsync(string? exceptId = null)

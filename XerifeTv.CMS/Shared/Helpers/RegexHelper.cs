@@ -47,4 +47,8 @@ public class RegexHelper
             return false;
         }
     }
+
+    // URL http(s) cujo host é exatamente o informado
+    public static string UrlHostPattern(string host)
+        => $@"^\s*https?://{Regex.Escape(host)}([:/?#]|$)";
 }

@@ -406,16 +406,17 @@
         // como hls o video.js baixaria via XHR (CORS error); no proxy o servidor segue até o arquivo final
         const hasExtension = /\.[a-z0-9]{2,5}$/i.test(new URL(originalUrl).pathname)
 
-        if (/^https:\/\//i.test(originalUrl)) {
+        if (/^https:\/\//i.test(originalUrl) && !source.viaServer) {
             return { ...source, url: originalUrl, streamFormat: hasExtension ? source.streamFormat : 'mp4' }
         }
 
         // Sem extensão o formato real vem do servidor (extensão do arquivo final)
         const streamFormat = ((hasExtension && source.streamFormat) || 'mp4').toLowerCase()
+        const followRedirect = source.viaServer || !hasExtension
         const params = new URLSearchParams({
             urlFixed: originalUrl,
             streamFormat,
-            followRedirect: hasExtension ? 'false' : 'true',
+            followRedirect: followRedirect ? 'true' : 'false',
             isCached: 'false'
         })
 
@@ -518,7 +519,13 @@
         if (generation === playbackGeneration) showError('Não foi possível carregar o vídeo em nenhuma fonte.')
     }
 
-    // Player não conseguiu tocar a fonte atual: tira do menu e segue pras próximas
+    // Link https que pula pra http (ex: bestcine /r/... -> http://crnett...) é bloqueado no navegador (mixed content)
+    function canRetryViaServer(source) {
+        return Boolean(source && source.direct && !source.viaServer
+            && /^https:\/\//i.test(source.originalUrl || getSourceUrl(source)))
+    }
+
+    // Player não conseguiu tocar a fonte atual: tenta pelo servidor uma vez, senão tira do menu e segue
     function discardCurrentAndPlayNext() {
         const failedIndex = currentSources.findIndex(s => getSourceUrl(s) === currentSourceUrl)
         if (failedIndex < 0) {
@@ -526,10 +533,19 @@
             return
         }
 
-        console.warn('Fonte falhou, tentando a próxima:', currentSourceUrl)
-        setLoading(true, 'Tentando outra fonte...')
         const failedSource = currentSources[failedIndex]
         currentSourceUrl = null
+
+        if (canRetryViaServer(failedSource)) {
+            console.warn('Fonte falhou direto, tentando pelo servidor:', getSourceUrl(failedSource))
+            setLoading(true, 'Tentando pelo servidor...')
+            updateSourceMenu(currentSources.map(s => s === failedSource ? { ...failedSource, viaServer: true } : s))
+            playFromIndex(failedIndex)
+            return
+        }
+
+        console.warn('Fonte falhou, tentando a próxima:', getSourceUrl(failedSource))
+        setLoading(true, 'Tentando outra fonte...')
         updateSourceMenu(currentSources.filter(s => s !== failedSource))
         playFromIndex(failedIndex)
     }

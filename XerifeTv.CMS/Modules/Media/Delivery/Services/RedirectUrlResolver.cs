@@ -1,4 +1,3 @@
-using System.Net;
 using XerifeTv.CMS.Modules.Common;
 using XerifeTv.CMS.Modules.Media.Delivery.Intefaces;
 
@@ -66,7 +65,7 @@ public class RedirectUrlResolver(
 
         for (var hop = 0; ; hop++)
         {
-            var response = await SendHeadOrGetAsync(client, currentUri, cancellationToken);
+            var response = await SendHeadersOnlyGetAsync(client, currentUri, cancellationToken);
 
             var location = response.Headers.Location;
             if (hop >= MaxDowngradeRedirects
@@ -80,24 +79,14 @@ public class RedirectUrlResolver(
         }
     }
 
-    /// <summary>
-    /// Tenta HEAD primeiro para nao baixar o arquivo. CDNs que nao aceitam HEAD
-    /// respondem 405/501 - nesses casos refaz com GET lendo apenas os headers.
-    /// </summary>
-    private static async Task<HttpResponseMessage> SendHeadOrGetAsync(
+    // GET e nao HEAD: ha servidor (ex: crnett.shop) que responde 200 vazio no HEAD e so redireciona no GET
+    private static async Task<HttpResponseMessage> SendHeadersOnlyGetAsync(
         HttpClient client,
         Uri requestUri,
         CancellationToken cancellationToken)
     {
-        using var headRequest = new HttpRequestMessage(HttpMethod.Head, requestUri);
-        var response = await client.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        if (response.StatusCode is not (HttpStatusCode.MethodNotAllowed or HttpStatusCode.NotImplemented or HttpStatusCode.Forbidden))
-            return response;
-
-        response.Dispose();
-
-        using var getRequest = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        return await client.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+        return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 }

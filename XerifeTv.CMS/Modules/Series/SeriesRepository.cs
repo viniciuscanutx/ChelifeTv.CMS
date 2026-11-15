@@ -1,14 +1,17 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System.Linq.Expressions;
 using XerifeTv.CMS.Modules.Abstractions.Repositories;
+using XerifeTv.CMS.Modules.Abstractions.ValueObjects;
 using XerifeTv.CMS.Modules.Common;
 using XerifeTv.CMS.Modules.Common.Dtos;
 using XerifeTv.CMS.Modules.Series.Dtos.Request;
 using XerifeTv.CMS.Modules.Series.Enums;
 using XerifeTv.CMS.Modules.Series.Interfaces;
 using XerifeTv.CMS.Shared.Database.MongoDB;
+using XerifeTv.CMS.Shared.Helpers;
 
 namespace XerifeTv.CMS.Modules.Series;
 
@@ -316,5 +319,37 @@ public sealed class SeriesRepository(IOptions<DBSettings> options)
     public async Task<long> CountByFranchiseIdAsync(string franchiseId)
     {
         return await _collection.CountDocumentsAsync(r => r.FranchiseId == franchiseId);
+    }
+
+    // Séries (com episódios) que têm algum episódio com link no host informado
+    public async Task<IReadOnlyList<SeriesEntity>> GetWithEpisodesByVideoHostAsync(string host)
+    {
+        var hostRegex = new BsonRegularExpression(RegexHelper.UrlHostPattern(host), "i");
+        var episodeFilter = Builders<Episode>.Filter.Or(
+            Builders<Episode>.Filter.Regex(e => e.Video!.Url, hostRegex),
+            Builders<Episode>.Filter.Regex(e => e.AlternativeVideoUrl, hostRegex));
+        var filter = Builders<SeriesEntity>.Filter.ElemMatch(r => r.Episodes, episodeFilter);
+
+        return await _collection.Find(filter).ToListAsync();
+    }
+
+    // Atualiza só os links de cada episódio (posicional), sem regravar o array inteiro
+    public async Task UpdateEpisodesVideoUrlsAsync(
+        string seriesId,
+        IEnumerable<(string EpisodeId, Video? Video, string? AlternativeVideoUrl)> episodes)
+    {
+        var updates = episodes
+            .Select(episode => new UpdateOneModel<SeriesEntity>(
+                Builders<SeriesEntity>.Filter.And(
+                    Builders<SeriesEntity>.Filter.Eq(r => r.Id, seriesId),
+                    Builders<SeriesEntity>.Filter.ElemMatch(r => r.Episodes, e => e.Id == episode.EpisodeId)),
+                Builders<SeriesEntity>.Update
+                    .Set(r => r.Episodes.FirstMatchingElement().Video, episode.Video)
+                    .Set(r => r.Episodes.FirstMatchingElement().AlternativeVideoUrl, episode.AlternativeVideoUrl)))
+            .ToList();
+
+        if (updates.Count == 0) return;
+
+        await _collection.BulkWriteAsync(updates);
     }
 }

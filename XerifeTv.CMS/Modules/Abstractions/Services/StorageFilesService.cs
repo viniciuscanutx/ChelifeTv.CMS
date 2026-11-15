@@ -64,6 +64,12 @@ public class StorageFilesService : IStorageFilesService, IDisposable
 
             return Result<string>.Success($"{_publicBaseUrl}/{key}");
         }
+        catch (AmazonS3Exception ex)
+        {
+            // Status e código do S3 (ex.: 403 InvalidAccessKeyId) ficam aqui, não na InnerException
+            var error = new Error("500", $"S3 {(int)ex.StatusCode} {ex.ErrorCode}: {ex.Message}");
+            return Result<string>.Failure(error);
+        }
         catch (Exception ex)
         {
             var error = new Error("500", ex.InnerException?.Message ?? ex.Message);

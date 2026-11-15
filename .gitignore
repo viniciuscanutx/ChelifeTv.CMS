@@ -96,6 +96,9 @@ XerifeTVWeb/
 
 .claude/
 
+/publish/
+
+/scripts/
 
 AGENTS.md
 

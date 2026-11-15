@@ -3,12 +3,14 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Linq.Expressions;
 using XerifeTv.CMS.Modules.Abstractions.Repositories;
+using XerifeTv.CMS.Modules.Abstractions.ValueObjects;
 using XerifeTv.CMS.Modules.Common;
 using XerifeTv.CMS.Modules.Common.Dtos;
 using XerifeTv.CMS.Modules.Movie.Dtos.Request;
 using XerifeTv.CMS.Modules.Movie.Enums;
 using XerifeTv.CMS.Modules.Movie.Interfaces;
 using XerifeTv.CMS.Shared.Database.MongoDB;
+using XerifeTv.CMS.Shared.Helpers;
 
 namespace XerifeTv.CMS.Modules.Movie;
 
@@ -209,5 +211,25 @@ public sealed class MovieRepository(IOptions<DBSettings> options)
     public async Task<long> CountByFranchiseIdAsync(string franchiseId)
     {
         return await _collection.CountDocumentsAsync(r => r.FranchiseId == franchiseId);
+    }
+
+    // Filmes com link principal ou alternativo no host informado
+    public async Task<IReadOnlyList<MovieEntity>> GetByVideoHostAsync(string host)
+    {
+        var hostRegex = new BsonRegularExpression(RegexHelper.UrlHostPattern(host), "i");
+        var filter = Builders<MovieEntity>.Filter.Or(
+            Builders<MovieEntity>.Filter.Regex(r => r.Video!.Url, hostRegex),
+            Builders<MovieEntity>.Filter.Regex(r => r.AlternativeVideoUrl, hostRegex));
+
+        return await _collection.Find(filter).ToListAsync();
+    }
+
+    public async Task UpdateVideoUrlsAsync(string movieId, Video? video, string? alternativeVideoUrl)
+    {
+        var update = Builders<MovieEntity>.Update
+            .Set(r => r.Video, video)
+            .Set(r => r.AlternativeVideoUrl, alternativeVideoUrl);
+
+        await _collection.UpdateOneAsync(r => r.Id == movieId, update);
     }
 }
