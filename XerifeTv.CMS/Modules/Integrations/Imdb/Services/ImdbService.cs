@@ -232,6 +232,97 @@ public class ImdbService(IConfiguration _configuration, IHttpClientFactory _http
         }
     }
 
+    public async Task<Result<GetMovieCreditsResponseDto?>> GetMovieCreditsAsync(string tmdbOrImdbId)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var url = $"https://api.themoviedb.org/3/movie/{Uri.EscapeDataString(tmdbOrImdbId)}/credits";
+            var tmdbKey = _configuration["Tmdb:Key"];
+
+            var response = await client.GetAsync($"{url}?api_key={tmdbKey}&language=pt-BR");
+
+            if (!response.IsSuccessStatusCode)
+                return Result<GetMovieCreditsResponseDto?>.Failure(
+                    new Error("400", $"[{tmdbOrImdbId}] TMDB API retornou: {response.ReasonPhrase}"));
+
+            var responseJsonString = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<GetMovieCreditsResponseDto>(responseJsonString);
+
+            if (result is null)
+                return Result<GetMovieCreditsResponseDto?>.Failure(
+                    new Error("404", $"Creditos do filme {tmdbOrImdbId} nao encontrados"));
+
+            return Result<GetMovieCreditsResponseDto?>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            var error = new Error("500", ex.InnerException?.Message ?? ex.Message);
+            return Result<GetMovieCreditsResponseDto?>.Failure(error);
+        }
+    }
+
+    public async Task<Result<GetSeriesCreditsResponseDto?>> GetSeriesCreditsAsync(int tmdbId)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var url = $"https://api.themoviedb.org/3/tv/{tmdbId}/aggregate_credits";
+            var tmdbKey = _configuration["Tmdb:Key"];
+
+            var response = await client.GetAsync($"{url}?api_key={tmdbKey}&language=pt-BR");
+
+            if (!response.IsSuccessStatusCode)
+                return Result<GetSeriesCreditsResponseDto?>.Failure(
+                    new Error("400", $"[{tmdbId}] TMDB API retornou: {response.ReasonPhrase}"));
+
+            var responseJsonString = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<GetSeriesCreditsResponseDto>(responseJsonString);
+
+            if (result is null)
+                return Result<GetSeriesCreditsResponseDto?>.Failure(
+                    new Error("404", $"Creditos da serie {tmdbId} nao encontrados"));
+
+            return Result<GetSeriesCreditsResponseDto?>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            var error = new Error("500", ex.InnerException?.Message ?? ex.Message);
+            return Result<GetSeriesCreditsResponseDto?>.Failure(error);
+        }
+    }
+
+    public async Task<Result<GetPersonResponseDto?>> GetPersonAsync(int personId, string language, bool includeCredits)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var url = $"https://api.themoviedb.org/3/person/{personId}";
+            var tmdbKey = _configuration["Tmdb:Key"];
+            var append = includeCredits ? "&append_to_response=combined_credits" : string.Empty;
+
+            var response = await client.GetAsync($"{url}?api_key={tmdbKey}&language={language}{append}");
+
+            if (!response.IsSuccessStatusCode)
+                return Result<GetPersonResponseDto?>.Failure(
+                    new Error("400", $"[{personId}] TMDB API retornou: {response.ReasonPhrase}"));
+
+            var responseJsonString = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<GetPersonResponseDto>(responseJsonString);
+
+            if (result is null)
+                return Result<GetPersonResponseDto?>.Failure(
+                    new Error("404", $"Pessoa {personId} nao encontrada"));
+
+            return Result<GetPersonResponseDto?>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            var error = new Error("500", ex.InnerException?.Message ?? ex.Message);
+            return Result<GetPersonResponseDto?>.Failure(error);
+        }
+    }
+
     public async Task<Result<GetSeriesByImdbResponseDto?>> GetSeriesByTmdbIdAsync(int tmdbId)
     {
         try

@@ -18,4 +18,6 @@ public interface IMovieRepository : IBaseRepository<MovieEntity>
     Task<long> CountByFranchiseIdAsync(string franchiseId);
     Task<IReadOnlyList<MovieEntity>> GetByVideoHostAsync(string host);
     Task UpdateVideoUrlsAsync(string movieId, Video? video, string? alternativeVideoUrl);
+    Task<IReadOnlyList<MovieEntity>> GetEnabledByTmdbIdsOrTitlesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> titles);
+    Task UpdateCreditsAsync(string movieId, ICollection<CastMember> cast, ICollection<CrewMember> crew, string? tmdbId);
 }

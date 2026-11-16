@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using XerifeTv.CMS.Modules.Abstractions.Interfaces;
+using XerifeTv.CMS.Modules.Common;
 using XerifeTv.CMS.Modules.Content.Dtos.Response;
 using XerifeTv.CMS.Modules.Content.Interfaces;
 
@@ -12,6 +13,8 @@ namespace XerifeTv.CMS.Controllers.ContentAPI;
 [EnableCors("AuthApi")]
 public class ContentV2Controller(
     IContentV2Service _service,
+    ICreditsService _creditsService,
+    IPeopleService _peopleService,
     ILogger<ContentV2Controller> _logger,
     ICacheService _cacheService) : ControllerBase
 {
@@ -252,6 +255,66 @@ public class ContentV2Controller(
             _cacheService.SetContentValue(cacheKey, response.Data);
             return Ok(response.Data);
         }
+
+        return BadRequest();
+    }
+
+    [HttpGet]
+    [Route("movies/{movieId}/credits")]
+    public async Task<IActionResult> MovieCredits(string movieId)
+    {
+        _logger.LogInformation("Request Content API v2 /movies/{movieId}/credits", movieId);
+        return await CreditsResponseAsync($"content_v2_movie_credits_{movieId}", () => _creditsService.GetMovieCreditsAsync(movieId));
+    }
+
+    [HttpGet]
+    [Route("series/{seriesId}/credits")]
+    public async Task<IActionResult> SeriesCredits(string seriesId)
+    {
+        _logger.LogInformation("Request Content API v2 /series/{seriesId}/credits", seriesId);
+        return await CreditsResponseAsync($"content_v2_series_credits_{seriesId}", () => _creditsService.GetSeriesCreditsAsync(seriesId));
+    }
+
+    [HttpGet]
+    [Route("people/{personId:int}")]
+    public async Task<IActionResult> PersonById(int personId)
+    {
+        _logger.LogInformation("Request Content API v2 /people/{personId}", personId);
+
+        var cacheKey = $"content_v2_person_{personId}";
+        var responseCache = _cacheService.GetValue<object>(cacheKey);
+        if (responseCache != null) return Ok(responseCache);
+
+        var response = await _peopleService.GetPersonAsync(personId);
+
+        if (response.IsSuccess)
+        {
+            _cacheService.SetContentValue(cacheKey, response.Data);
+            return Ok(response.Data);
+        }
+
+        if (response.Error.Code == "404")
+            return NotFound();
+
+        return BadRequest();
+    }
+
+    private async Task<IActionResult> CreditsResponseAsync(string cacheKey, Func<Task<Result<CreditsContentV2ResponseDto>>> load)
+    {
+        var responseCache = _cacheService.GetValue<object>(cacheKey);
+        if (responseCache != null) return Ok(responseCache);
+
+        var response = await load();
+
+        if (response.IsSuccess)
+        {
+            // Creditos vazios nao vao pro cache para nao segurar uma falha do TMDB
+            if (response.Data is { IsEmpty: false }) _cacheService.SetContentValue(cacheKey, response.Data);
+            return Ok(response.Data);
+        }
+
+        if (response.Error.Code == "404")
+            return NotFound();
 
         return BadRequest();
     }

@@ -17,6 +17,9 @@ public class MovieEntity : MediaContent
     public string? MediaRoute { get; set; }
     public string? LogoUrl { get; set; }
     public string? TrailerVideoYoutubeId { get; set; }
+    // null = creditos ainda nao buscados no TMDB
+    public ICollection<CastMember>? Cast { get; set; }
+    public ICollection<CrewMember>? Crew { get; set; }
     [BsonElement("high_quality")]
     public bool HighQuality { get; set; } = false;
     public bool Disabled { get; set; } = false;

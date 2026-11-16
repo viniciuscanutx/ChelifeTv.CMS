@@ -352,4 +352,25 @@ public sealed class SeriesRepository(IOptions<DBSettings> options)
 
         await _collection.BulkWriteAsync(updates);
     }
+
+    public async Task<IReadOnlyList<SeriesEntity>> GetEnabledByTmdbIdsOrTitlesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> titles)
+    {
+        var builder = Builders<SeriesEntity>.Filter;
+        var filter = builder.And(
+            builder.Eq(r => r.Disabled, false),
+            builder.Or(builder.In(r => r.TmdbId, tmdbIds), builder.In(r => r.Title, titles)));
+
+        return await _collection.Find(filter).ToListAsync();
+    }
+
+    public async Task UpdateCreditsAsync(string seriesId, ICollection<CastMember> cast, ICollection<CrewMember> crew, string? tmdbId)
+    {
+        var update = Builders<SeriesEntity>.Update
+            .Set(r => r.Cast, cast)
+            .Set(r => r.Crew, crew);
+
+        if (!string.IsNullOrWhiteSpace(tmdbId)) update = update.Set(r => r.TmdbId, tmdbId);
+
+        await _collection.UpdateOneAsync(r => r.Id == seriesId, update);
+    }
 }

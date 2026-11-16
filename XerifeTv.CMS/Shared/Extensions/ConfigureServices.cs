@@ -17,6 +17,10 @@ using XerifeTv.CMS.Modules.Channel;
 using XerifeTv.CMS.Modules.Channel.Importers;
 using XerifeTv.CMS.Modules.Channel.Interfaces;
 using XerifeTv.CMS.Modules.Content;
+using XerifeTv.CMS.Modules.Content.Credits;
+using XerifeTv.CMS.Modules.Content.People;
+using XerifeTv.CMS.Modules.Person;
+using XerifeTv.CMS.Modules.Person.Interfaces;
 using XerifeTv.CMS.Modules.Content.Interfaces;
 using XerifeTv.CMS.Modules.Dashboard;
 using XerifeTv.CMS.Modules.Dashboard.Interfaces;
@@ -90,6 +94,7 @@ public static class ConfigureServices
 	{
 		services.AddScoped<IMovieRepository, MovieRepository>();
 		services.AddScoped<ISeriesRepository, SeriesRepository>();
+		services.AddScoped<IPersonRepository, PersonRepository>();
 		services.AddScoped<IChannelRepository, ChannelRepository>();
 		services.AddScoped<IFranchiseRepository, FranchiseRepository>();
 		services.AddScoped<IUserRepository, UserRepository>();
@@ -119,6 +124,8 @@ public static class ConfigureServices
 		services.AddScoped<IDashboardService, DashboardService>();
 		services.AddScoped<IContentV1Service, ContentV1Service>();
         services.AddScoped<IContentV2Service, ContentV2Service>();
+        services.AddScoped<ICreditsService, CreditsService>();
+        services.AddScoped<IPeopleService, PeopleService>();
         services.AddScoped<IUserService, UserService>();
 		services.AddScoped<ITokenService, TokenService>();
 		services.AddScoped<IAuthService, AuthService>();

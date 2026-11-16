@@ -22,4 +22,6 @@ public interface ISeriesRepository : IBaseRepository<SeriesEntity>
     Task<long> CountByFranchiseIdAsync(string franchiseId);
     Task<IReadOnlyList<SeriesEntity>> GetWithEpisodesByVideoHostAsync(string host);
     Task UpdateEpisodesVideoUrlsAsync(string seriesId, IEnumerable<(string EpisodeId, Video? Video, string? AlternativeVideoUrl)> episodes);
+    Task<IReadOnlyList<SeriesEntity>> GetEnabledByTmdbIdsOrTitlesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> titles);
+    Task UpdateCreditsAsync(string seriesId, ICollection<CastMember> cast, ICollection<CrewMember> crew, string? tmdbId);
 }

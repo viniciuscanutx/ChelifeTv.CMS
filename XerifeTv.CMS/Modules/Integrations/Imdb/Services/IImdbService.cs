@@ -13,4 +13,7 @@ public interface IImdbService
     Task<Result<SearchSeriesByNameResponseDto?>> SearchSeriesByNameAsync(string query);
     Task<Result<GetMovieByImdbResponseDto?>> GetMovieByTmdbIdAsync(int tmdbId);
     Task<Result<GetSeriesByImdbResponseDto?>> GetSeriesByTmdbIdAsync(int tmdbId);
+    Task<Result<GetMovieCreditsResponseDto?>> GetMovieCreditsAsync(string tmdbOrImdbId);
+    Task<Result<GetSeriesCreditsResponseDto?>> GetSeriesCreditsAsync(int tmdbId);
+    Task<Result<GetPersonResponseDto?>> GetPersonAsync(int personId, string language, bool includeCredits);
 }

@@ -232,4 +232,25 @@ public sealed class MovieRepository(IOptions<DBSettings> options)
 
         await _collection.UpdateOneAsync(r => r.Id == movieId, update);
     }
+
+    public async Task<IReadOnlyList<MovieEntity>> GetEnabledByTmdbIdsOrTitlesAsync(IReadOnlyCollection<string> tmdbIds, IReadOnlyCollection<string> titles)
+    {
+        var builder = Builders<MovieEntity>.Filter;
+        var filter = builder.And(
+            builder.Eq(r => r.Disabled, false),
+            builder.Or(builder.In(r => r.TmdbId, tmdbIds), builder.In(r => r.Title, titles)));
+
+        return await _collection.Find(filter).ToListAsync();
+    }
+
+    public async Task UpdateCreditsAsync(string movieId, ICollection<CastMember> cast, ICollection<CrewMember> crew, string? tmdbId)
+    {
+        var update = Builders<MovieEntity>.Update
+            .Set(r => r.Cast, cast)
+            .Set(r => r.Crew, crew);
+
+        if (!string.IsNullOrWhiteSpace(tmdbId)) update = update.Set(r => r.TmdbId, tmdbId);
+
+        await _collection.UpdateOneAsync(r => r.Id == movieId, update);
+    }
 }
